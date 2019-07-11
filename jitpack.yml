@@ -1,0 +1,5 @@
+before_install:
+  - npm install yarn
+
+install:
+  - ./gradlew publishToMavenLocal
