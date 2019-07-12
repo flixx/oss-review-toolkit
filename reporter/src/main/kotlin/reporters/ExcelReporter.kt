@@ -199,12 +199,12 @@ class ExcelReporter : Reporter() {
 
         val sheet = workbook.createSheet(sheetName)
 
-        val headerRows = createHeader(sheet, name, null, file, vcsInfo, extraColumns)
+        val headerRows = createHeader(sheet, name, file, vcsInfo, extraColumns)
         var currentRow = headerRows
 
         table.rows.forEach { row ->
-            val isExcluded = row.scopes.all { (id, scopes) ->
-                table.projectExcludes[id] != null || (scopes.isNotEmpty() && scopes.all { it.value.isNotEmpty() })
+            val isExcluded = row.scopes.all { (_, scopes) ->
+                scopes.isNotEmpty() && scopes.all { it.value.isNotEmpty() }
             }
 
             val font = if (isExcluded) excludedFont else defaultFont
@@ -219,25 +219,15 @@ class ExcelReporter : Reporter() {
             val scopesText = XSSFRichTextString()
 
             row.scopes.entries.sortedWith(compareBy({
-                table.projectExcludes[it.key] != null || it.value.values.isNotEmpty()
+                it.value.values.isNotEmpty()
             }, { it.key })).forEach { (id, scopes) ->
-                val projectExclude = table.projectExcludes[id]
-
-                if (projectExclude != null) {
-                    scopesText.append(
-                        "${id.toCoordinates()} " +
-                                "(Excluded: ${projectExclude.reason} - ${projectExclude.comment})\n",
-                        excludedFont
-                    )
-                } else {
-                    scopesText.append("${id.toCoordinates()}\n", font)
-                }
+                scopesText.append("${id.toCoordinates()}\n", font)
 
                 scopes.entries.sortedWith(compareBy({ it.value.isNotEmpty() }, { it.key }))
                     .forEach { (scope, excludes) ->
                         scopesText.append(
                             "  $scope\n",
-                            if (projectExclude != null || excludes.isNotEmpty()) excludedFont else font
+                            if (excludes.isNotEmpty()) excludedFont else font
                         )
 
                         excludes.forEach { exclude ->
@@ -304,7 +294,7 @@ class ExcelReporter : Reporter() {
 
         val sheet = workbook.createSheet(sheetName)
 
-        val headerRows = createHeader(sheet, name, table.projectExclude, file, vcsInfo, extraColumns)
+        val headerRows = createHeader(sheet, name, file, vcsInfo, extraColumns)
         var currentRow = headerRows
 
         table.rows.forEach { row ->
@@ -354,17 +344,14 @@ class ExcelReporter : Reporter() {
     }
 
     private fun createHeader(
-        sheet: XSSFSheet, name: String, exclude: ProjectExclude?, file: String, vcsInfo: VcsInfo,
+        sheet: XSSFSheet, name: String, file: String, vcsInfo: VcsInfo,
         extraColumns: List<String>
     ): Int {
         val columns = defaultColumns + extraColumns.size
 
         sheet.createRow(0).apply {
-            val text = exclude?.let { "$name - This project is excluded: ${exclude.reason} - ${exclude.comment}" }
-                ?: name
-
             CellUtil.createCell(this, 0, "Project:", headerStyle)
-            CellUtil.createCell(this, 1, text, headerStyle)
+            CellUtil.createCell(this, 1, name, headerStyle)
         }
         sheet.addMergedRegion(CellRangeAddress(0, 0, 1, columns))
 
